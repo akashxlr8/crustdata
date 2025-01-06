@@ -1,0 +1,4 @@
+streamlit==1.41.1
+langgraph==0.2.61
+langchain-core==0.3.29
+langchain==0.3.14
