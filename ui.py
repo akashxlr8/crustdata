@@ -1,51 +1,31 @@
 import streamlit as st
 from utils import write_message
-# tag::import_agent[]
-# from agent import generate_response
-# end::import_agent[]
+from agent import generate_response
 
-# tag::setup[]
 # Page Config
-st.set_page_config("Ebert", page_icon=":movie_camera:")
-# end::setup[]
+st.set_page_config("CrustData Assistant", page_icon="🤖")
 
-# tag::session[]
 # Set up Session State
 if "messages" not in st.session_state:
     st.session_state.messages = [
-        {"role": "assistant", "content": "Hi, I'm the GraphAcademy Chatbot!  How can I help you?"},
+        {"role": "assistant", "content": "Hi! I'm the CrustData Assistant. How can I help you with the API?"},
     ]
-# end::session[]
 
-# tag::submit[]
 # Submit handler
 def handle_submit(message):
-    """
-    Submit handler:
-
-    You will modify this method to talk with an LLM and provide
-    context using data from Neo4j.
-    """
-
-    # Handle the response
+    """Submit handler that uses our RAG agent"""
     with st.spinner('Thinking...'):
         # Call the agent
-        # response = generate_response(message)
-        write_message('assistant', "Hello")
-        
-# end::submit[]
+        response = generate_response(message)
+        write_message('assistant', response)
 
-
-# tag::chat[]
 # Display messages in Session State
 for message in st.session_state.messages:
     write_message(message['role'], message['content'], save=False)
 
 # Handle any user input
-if prompt := st.chat_input("What is up?"):
-    # Display user message in chat message container
+if prompt := st.chat_input("Ask me about the CrustData API..."):
+    # Display user message
     write_message('user', prompt)
-
-    # Generate a response
+    # Generate response
     handle_submit(prompt)
-# end::chat[]
