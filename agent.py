@@ -3,31 +3,37 @@ from chat.main_graph.state import InputState, AgentState
 from langchain_core.runnables import RunnableConfig
 from loguru import logger
 from langchain_core.messages import HumanMessage, AIMessage
+import streamlit as st
 
 # Configure logger
 logger.add("agent.log", rotation="500 MB", level="INFO")
-
 def generate_response(message: str) -> str:
-    """
-    Generate a response using the RAG graph
-    """
-    # Get existing messages from session state if available
-    if not hasattr(generate_response, "message_history"):
-        generate_response.message_history = []
+    """Generate a response using the RAG graph"""
+    # Convert Streamlit session state messages to LangChain messages
+    current_messages = []
     
-    # Create input state with user_message and history
+    # Log Streamlit state before conversion
+    logger.info(f"Streamlit session state messages: {st.session_state.messages}")
+    
+    for msg in st.session_state.messages:
+        if msg["role"] == "user":
+            current_messages.append(HumanMessage(content=msg["content"]))
+        elif msg["role"] == "assistant":
+            current_messages.append(AIMessage(content=msg["content"]))
+    
+    # Log converted messages
+    logger.info(f"Converted LangChain messages: {[f'{msg.type}: {msg.content}' for msg in current_messages]}")    
+    # Create input state with user_message and converted messages
     state = InputState(
         user_message=message,
-        messages=generate_response.message_history
+        messages=current_messages
     )
     
     try:
         result = graph.invoke(state, config=RunnableConfig())
         logger.info(f"Graph Result: {result}")
         
-        # Update message history
         if isinstance(result, AgentState):
-            generate_response.message_history = result.messages
             return result.answer or ""
         elif isinstance(result, dict) and "answer" in result:
             return result["answer"] or ""
