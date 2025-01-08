@@ -3,8 +3,8 @@ from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 from .state import AgentState, InputState
 from datetime import datetime
 from langchain_core.messages import RemoveMessage
-
-
+import json
+import streamlit as st
 from langchain_core.runnables import RunnableConfig
 from loguru import logger
 from .configuration import AgentConfiguration, vector_store
@@ -15,26 +15,48 @@ load_dotenv()
 
 logger.add("loguru.log")
 
-def entry(state: InputState):
+def entry(state: InputState) -> AgentState:
     """Entry point adds the current message to conversation history"""
-    # Create new state with current message added to history
+    current_messages = []
+    
+    # Convert Streamlit session state messages to LangChain messages
+    for msg in st.session_state.messages[-4:]:  # Keep last 4 messages
+        if msg["role"] == "user":
+            current_messages.append(HumanMessage(content=msg["content"]))
+        elif msg["role"] == "assistant":
+            current_messages.append(AIMessage(content=msg["content"]))
+    
+    # Add current user message
+    current_messages.append(HumanMessage(content=state.user_message))
+    
+    logger.info(f"Messages in entry node: {[msg.content for msg in current_messages]}")
+    
     return AgentState(
         user_message=state.user_message,
-        messages=[*state.messages[-3:], HumanMessage(content=state.user_message)]
+        messages=current_messages
     )
 
-def process_and_generate(state: AgentState, *, config: RunnableConfig):
+def process_and_generate(state: AgentState, *, config: RunnableConfig) -> AgentState:
     """
     Combined function that handles retrieval, augmentation, and response generation.
     1. Retrieves relevant documents
     2. Augments with context
     3. Generates response using LLM
     """
+    # Single log for initial messages
+    logger.info(f"Initial messages in process_and_generate: {[msg.content for msg in state.messages]}")
+    
     # Retrieval step
     query = str(state.user_message)
     retrieved_docs = vector_store.similarity_search(query)
     
-    # Augmentation step
+    # Get conversation history
+    conversation_history = "\nConversation History:\n"
+    for msg in state.messages[-3:]:  # Last 3 messages
+        role = "User" if isinstance(msg, HumanMessage) else "Assistant"
+        conversation_history += f"{role}: {msg.content}\n"
+    
+    # Augmentation step with conversation history
     docs_content = "\n\n".join(
         f"--------Heading: Chunk number {i+1}---------\nContent: {doc.page_content}" 
         for i, doc in enumerate(retrieved_docs)
@@ -43,6 +65,7 @@ def process_and_generate(state: AgentState, *, config: RunnableConfig):
     configuration = AgentConfiguration.from_runnable_config(config)
     system_message = configuration.main_graph_system_prompt.format(
         context=docs_content,
+        conversation_history=conversation_history,
         question=state.user_message
     )
     
@@ -52,19 +75,26 @@ def process_and_generate(state: AgentState, *, config: RunnableConfig):
         *state.messages[-3:]  # Keep last 3 messages for context
     ]
     
-    llm = load_chat_model(configuration.response_model)
+    llm = load_chat_model(configuration.query_model)
     response = llm.invoke(messages)
     logger.info(f"Response in process_and_generate: {response}")
     
     # Create AI message
     ai_message = AIMessage(content=str(response.content) if hasattr(response, 'content') else str(response))
+    updated_messages = [*state.messages, ai_message]
     
-    # Return updated state with new message and trimmed history
+    # Keep only last 4 messages
+    if len(updated_messages) > 4:
+        updated_messages = updated_messages[-4:]
+    
+    # Single log for final messages
+    logger.info(f"Final messages in process_and_generate: {[msg.content for msg in updated_messages]}")
+    
     return AgentState(
         user_message=state.user_message,
-        messages=[*state.messages[-3:], ai_message],  # Keep last 3 messages plus new response
+        messages=updated_messages,
         context=state.context,
-        answer=str(ai_message.content)  # Explicitly convert to string
+        answer=str(ai_message.content)
     )
 
 # Graph construction
