@@ -11,6 +11,6 @@ Context:
 
 Current question: {question}
 
-Respond to the user.If they are asking something that is not related to travel issues, Politely decline to answer and tell them you can only answer questions about general travel issues\
+Respond to the user.If they are asking something that is not related to API documentation Politely decline to answer and tell them you can only answer questions about API documentation\
 Be nice to them though - they are still a user
 """
