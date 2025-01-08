@@ -6,7 +6,7 @@ from langchain_community.embeddings import JinaEmbeddings
 from pydantic import SecretStr
 import os
 from typing import Any
-
+import streamlit as st
 @dataclass(kw_only=True)
 class AgentConfiguration(BaseConfiguration):
     """The configuration for the supervisor agent."""
@@ -42,6 +42,6 @@ class AgentConfiguration(BaseConfiguration):
     # )
     
 embeddings = JinaEmbeddings(
-        jina_api_key=SecretStr(os.getenv("JIN_API_KEY") or "jina_808c30ece3374808af85b4884df6f5eb4kd4UOSI6brj7ZvTE3qB2QfMuHba"), model_name="jina-embeddings-v3", session=Any
+        jina_api_key=SecretStr(st.secrets["JINAAI_API_KEY"]), model_name=st.secrets["EMBEDDINGS_MODEL_NAME"], session=Any
     )
-vector_store = PineconeVectorStore(index_name="crustdata-docs2", embedding=embeddings)
+vector_store = PineconeVectorStore(index_name=st.secrets["INDEX_NAME"], embedding=embeddings)
