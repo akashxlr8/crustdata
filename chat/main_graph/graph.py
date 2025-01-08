@@ -13,22 +13,21 @@ from ..common.utils import load_chat_model
 from dotenv import load_dotenv
 load_dotenv()
 
-logger.add("loguru.log")
+logger.add("logs/loguru.log", rotation="100kb")
 
 def entry(state: InputState) -> AgentState:
     """Entry point adds the current message to conversation history"""
-    current_messages = []
+    # Get existing messages from input state
+    current_messages = list(state.messages)
     
-    # Convert Streamlit session state messages to LangChain messages
-    for msg in st.session_state.messages[-4:]:  # Keep last 4 messages
-        if msg["role"] == "user":
-            current_messages.append(HumanMessage(content=msg["content"]))
-        elif msg["role"] == "assistant":
-            current_messages.append(AIMessage(content=msg["content"]))
+    # Add current user message if not already in history
+    if not current_messages or current_messages[-1].content != state.user_message:
+        current_messages.append(HumanMessage(content=state.user_message))
     
-    # Add current user message
-    current_messages.append(HumanMessage(content=state.user_message))
-    
+    # Keep only last 4 messages
+    if len(current_messages) > 4:
+        current_messages = current_messages[-4:]
+        
     logger.info(f"Messages in entry node: {[msg.content for msg in current_messages]}")
     
     return AgentState(
@@ -88,7 +87,7 @@ def process_and_generate(state: AgentState, *, config: RunnableConfig) -> AgentS
         updated_messages = updated_messages[-4:]
     
     # Single log for final messages
-    logger.info(f"Final messages in process_and_generate: {[msg.content for msg in updated_messages]}")
+    logger.info(f"Final messages in process_and_generate: {[msg for msg in updated_messages]}")
     
     return AgentState(
         user_message=state.user_message,
