@@ -17,7 +17,7 @@ class AgentConfiguration(BaseConfiguration):
     main_graph_system_prompt: str = field(
     default=prompts.Main_graph_system_prompt,
         metadata={
-            "description": "The system prompt used for classifying user questions to route them to the correct node."
+            "description": "The system prompt used for answering user questions based on the context."
         },
     )
     
