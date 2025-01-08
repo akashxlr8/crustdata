@@ -2,7 +2,6 @@ from langgraph.graph import START, StateGraph, END
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 from .state import AgentState, InputState
 from datetime import datetime
-import json
 from langchain_core.messages import RemoveMessage
 
 
@@ -16,18 +15,13 @@ load_dotenv()
 
 logger.add("loguru.log")
 
-def filter_messages(messages: list):
-    # This is very simple helper function which only ever uses the last message
-    return messages[-3:]
-
-
 def entry(state: InputState):
     """Entry point adds the current message to conversation history"""
+    # Create new state with current message added to history
     return AgentState(
         user_message=state.user_message,
-        messages=[HumanMessage(content=state.user_message)]
+        messages=[*state.messages[-3:], HumanMessage(content=state.user_message)]
     )
-
 
 def process_and_generate(state: AgentState, *, config: RunnableConfig):
     """
@@ -52,19 +46,26 @@ def process_and_generate(state: AgentState, *, config: RunnableConfig):
         question=state.user_message
     )
     
-    # Generation step
+    # Generation step with conversation history
     messages = [
         SystemMessage(content=system_message),
-        *state.messages
+        *state.messages[-3:]  # Keep last 3 messages for context
     ]
     
     llm = load_chat_model(configuration.response_model)
     response = llm.invoke(messages)
     logger.info(f"Response in process_and_generate: {response}")
     
-    # Return the response content directly
-    return {"answer": str(response.content) if hasattr(response, 'content') else str(response)}
-
+    # Create AI message
+    ai_message = AIMessage(content=str(response.content) if hasattr(response, 'content') else str(response))
+    
+    # Return updated state with new message and trimmed history
+    return AgentState(
+        user_message=state.user_message,
+        messages=[*state.messages[-3:], ai_message],  # Keep last 3 messages plus new response
+        context=state.context,
+        answer=str(ai_message.content)  # Explicitly convert to string
+    )
 
 # Graph construction
 graph_builder = StateGraph(AgentState)

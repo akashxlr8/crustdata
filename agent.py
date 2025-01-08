@@ -11,15 +11,23 @@ def generate_response(message: str) -> str:
     """
     Generate a response using the RAG graph
     """
-    # Create input state with user_message
-    state = InputState(user_message=message)
+    # Get existing messages from session state if available
+    if not hasattr(generate_response, "message_history"):
+        generate_response.message_history = []
+    
+    # Create input state with user_message and history
+    state = InputState(
+        user_message=message,
+        messages=generate_response.message_history
+    )
     
     try:
         result = graph.invoke(state, config=RunnableConfig())
         logger.info(f"Graph Result: {result}")
         
-        # Access the response field from OutputState
+        # Update message history
         if isinstance(result, AgentState):
+            generate_response.message_history = result.messages
             return result.answer or ""
         elif isinstance(result, dict) and "answer" in result:
             return result["answer"] or ""
