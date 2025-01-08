@@ -1,21 +1,20 @@
 from pydantic import BaseModel
 from typing import List, Optional
 from langchain_core.documents import Document
-from langchain_core.messages import AnyMessage, BaseMessage
+from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
 from typing_extensions import Annotated
 from langgraph.graph import add_messages
 
 class InputState(BaseModel):
-    """The input state for the main graph."""
+    """The input state contains only the current user message"""
     user_message: str
+
 
 class AgentState(InputState):
     """The state for the main graph."""
-    messages: Annotated[list[AnyMessage], add_messages] = []
+    messages: Annotated[List[BaseMessage], add_messages] = []  # Conversation history
     context: List[Document] = []
-    answer: str = ""
     system_message: Optional[str] = None
+    answer: Optional[str] = None
     
-class OutputState(BaseModel):
-    """The output state for the main graph."""
-    answer: str 
+
