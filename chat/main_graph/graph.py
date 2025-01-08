@@ -1,8 +1,10 @@
 from langgraph.graph import START, StateGraph, END
-from langchain_core.messages import SystemMessage, HumanMessage
-from .state import AgentState, InputState, OutputState
+from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
+from .state import AgentState, InputState
 from datetime import datetime
 import json
+from langchain_core.messages import RemoveMessage
+
 
 from langchain_core.runnables import RunnableConfig
 from loguru import logger
@@ -14,90 +16,67 @@ load_dotenv()
 
 logger.add("loguru.log")
 
+def filter_messages(messages: list):
+    # This is very simple helper function which only ever uses the last message
+    return messages[-3:]
+
+
 def entry(state: InputState):
-    """
-    This function is the entry point for the graph. It takes the input state and returns the initial state for the graph.
-    """
-    return {"user_message": state.user_message}
+    """Entry point adds the current message to conversation history"""
+    return AgentState(
+        user_message=state.user_message,
+        messages=[HumanMessage(content=state.user_message)]
+    )
 
-def retrieve(state: AgentState):
-    """
-    Retrieves the context documents from the vector store based on the user's `question`.
-    """
-    last_user_message = state.user_message
-    retrieved_docs = vector_store.similarity_search(last_user_message)
-    return {"context": retrieved_docs}
 
-def augment(state: AgentState, *, config: RunnableConfig):
+def process_and_generate(state: AgentState, *, config: RunnableConfig):
     """
-    Augments the context with the retrieved documents from  the retrieve node.
-    And makes the system message with the context and the user's question.
+    Combined function that handles retrieval, augmentation, and response generation.
+    1. Retrieves relevant documents
+    2. Augments with context
+    3. Generates response using LLM
     """
-  
-    retrieved_docs = state.context
+    # Retrieval step
+    query = str(state.user_message)
+    retrieved_docs = vector_store.similarity_search(query)
+    
+    # Augmentation step
     docs_content = "\n\n".join(
         f"--------Heading: Chunk number {i+1}---------\nContent: {doc.page_content}" 
         for i, doc in enumerate(retrieved_docs)
     )
+    
     configuration = AgentConfiguration.from_runnable_config(config)
-
     system_message = configuration.main_graph_system_prompt.format(
         context=docs_content,
         question=state.user_message
     )
-    return {"system_message": system_message}
-
-def generate(state: AgentState, *, config: RunnableConfig):
     
-    
-    # Create messages list with system message and the last user message
-    
-                      
+    # Generation step
     messages = [
-        SystemMessage(content=state.system_message or ""),
-        HumanMessage(content=state.user_message)
+        SystemMessage(content=system_message),
+        *state.messages
     ]
-    # Log the messages being sent
-    logger.info("Messages being sent to LLM:")
-    logger.info(messages)
-    configuration = AgentConfiguration.from_runnable_config(config)
+    
     llm = load_chat_model(configuration.response_model)
-    # Invoke the LLM with the messages
     response = llm.invoke(messages)
+    logger.info(f"Response in process_and_generate: {response}")
     
-    # Log the response
-    logger.info(f"LLM Response: {response.content}")
-    
-    # Return both answer and user_message to maintain state
-    return {"answer": response.content, "user_message": state.user_message}
+    # Return the response content directly
+    return {"answer": str(response.content) if hasattr(response, 'content') else str(response)}
 
-def exit(state: AgentState):
-    """This is the exit node for the graph. It takes the AgentState and returns the final state for the graph.
-    
-    Args:
-        state: The AgentState for the graph.
-        
-    Returns:
-        OutputState: The final answer in string format for the graph.
-    """
-    return OutputState(answer=state.answer)
 
 # Graph construction
 graph_builder = StateGraph(AgentState)
 
 # Add nodes
 graph_builder.add_node("entry", entry)
-graph_builder.add_node("retrieve", retrieve)
-graph_builder.add_node("augment", augment)
-graph_builder.add_node("generate", generate)
-graph_builder.add_node("exit", exit)
+graph_builder.add_node("process_and_generate", process_and_generate)
+
 # Add edges in sequence
 graph_builder.add_edge(START, "entry")
-graph_builder.add_edge("entry", "retrieve")
-graph_builder.add_edge("retrieve", "augment")
-graph_builder.add_edge("augment", "generate")
-graph_builder.add_edge("generate", "exit")
-graph_builder.add_edge("exit", END)
+graph_builder.add_edge("entry", "process_and_generate")
+graph_builder.add_edge("process_and_generate", END)
 
 # Compile the graph
 graph = graph_builder.compile()
