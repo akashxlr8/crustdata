@@ -1,6 +1,6 @@
 from langgraph.graph import START, StateGraph, END
 from langchain_core.messages import SystemMessage, HumanMessage
-from .state import AgentState, InputState
+from .state import AgentState, InputState, OutputState
 from datetime import datetime
 import json
 
@@ -68,35 +68,39 @@ def generate(state: AgentState, *, config: RunnableConfig):
     # Log the response
     logger.info(f"LLM Response: {response.content}")
     
-    return {"answer": response.content}
+    # Return both answer and user_message to maintain state
+    return {"answer": response.content, "user_message": state.user_message}
 
-from langgraph.graph import START, StateGraph
+def exit(state: AgentState):
+    """This is the exit node for the graph. It takes the AgentState and returns the final state for the graph.
+    
+    Args:
+        state: The AgentState for the graph.
+        
+    Returns:
+        OutputState: The final answer in string format for the graph.
+    """
+    return OutputState(answer=state.answer)
 
-# First define all nodes
-graph_builder = StateGraph(InputState)
+# Graph construction
+graph_builder = StateGraph(AgentState)
 
 # Add nodes
 graph_builder.add_node("entry", entry)
 graph_builder.add_node("retrieve", retrieve)
 graph_builder.add_node("augment", augment)
 graph_builder.add_node("generate", generate)
-
+graph_builder.add_node("exit", exit)
 # Add edges in sequence
 graph_builder.add_edge(START, "entry")
 graph_builder.add_edge("entry", "retrieve")
 graph_builder.add_edge("retrieve", "augment")
 graph_builder.add_edge("augment", "generate")
-graph_builder.add_edge("generate", END)
+graph_builder.add_edge("generate", "exit")
+graph_builder.add_edge("exit", END)
 
 # Compile the graph
 graph = graph_builder.compile()
-# 
-# result = graph.invoke({"question": """
-#      How do I search for people given their current title, current company and location?
-#                    """})
-# print(result)
-
-
 
 def log_query_details(result: dict):
     timestamp = datetime.now().isoformat()
