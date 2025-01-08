@@ -2,3 +2,10 @@ streamlit==1.41.1
 langgraph==0.2.61
 langchain-core==0.3.29
 langchain==0.3.14
+pinecone
+langchain-pinecone==0.2.0
+langchain_unstructured==0.1.6
+pinecone-client 
+langchain-openai
+loguru
+langgraph
