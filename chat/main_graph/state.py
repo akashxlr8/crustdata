@@ -10,6 +10,13 @@ class InputState(BaseModel):
     user_message: str
     messages: Annotated[list[AnyMessage], add_messages]  # Conversation history
 
+    def model_post_init(self, *args, **kwargs):
+        """Post initialization hook to trim messages"""
+        super().model_post_init(*args, **kwargs)
+        # Keep only last 10 messages
+        if len(self.messages) > 10:
+            self.messages = self.messages[-10:]
+            
 class AgentState(BaseModel):
     """The state for the main graph."""
     user_message: str
@@ -25,4 +32,9 @@ class AgentState(BaseModel):
     #     if len(self.messages) > 4:
     #         self.messages = self.messages[-4:]
     
-
+    def model_post_init(self, *args, **kwargs):
+        """Post initialization hook to trim messages"""
+        super().model_post_init(*args, **kwargs)
+        # Keep only last 10 messages
+        if len(self.messages) > 10:
+            self.messages = self.messages[-10:]
