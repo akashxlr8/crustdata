@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from ..common import prompts
-from chat.common.config import BaseConfiguration
+from chat.common.configuration import BaseConfiguration
 from langchain_pinecone import PineconeVectorStore
 from langchain_community.embeddings import JinaEmbeddings
 from pydantic import SecretStr

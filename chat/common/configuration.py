@@ -19,12 +19,12 @@ class BaseConfiguration:
         },
     )
 
-    response_model: Annotated[str, {"__template_metadata__": {"kind": "llm"}}] = field(
-        default="openai/gpt-4o-mini",
-        metadata={
-            "description": "The language model used for generating responses. Should be in the form: provider/model-name."
-        },
-    )
+    # response_model: Annotated[str, {"__template_metadata__": {"kind": "llm"}}] = field(
+    #     default="openai/gpt-4o-mini",
+    #     metadata={
+    #         "description": "The language model used for generating responses. Should be in the form: provider/model-name."
+    #     },
+    # )
 
     @classmethod
     def from_runnable_config(
