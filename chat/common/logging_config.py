@@ -36,6 +36,28 @@ logger.add(
     catch=True
 )
 
+logger.add(
+    "logs/error.log",
+    format=LOG_FORMAT,
+    level="ERROR",
+    enqueue=True,
+    catch=True,
+    rotation="1 day",
+    retention="30 days",
+    compression="zip",
+)
+
+logger.add(
+    "logs/debug.log",
+    format=LOG_FORMAT,
+    level="DEBUG",
+    enqueue=True,
+    catch=True,
+    rotation="1 day",
+    retention="30 days",
+    compression="zip",
+)
+
 def get_logger(module_name: str):
     """Get a logger instance with module context"""
     return logger.bind(module=module_name)

@@ -4,7 +4,6 @@ from langchain_community.tools.tavily_search import TavilySearchResults
 from langchain_core.tools import tool
 from langchain_experimental.utilities import PythonREPL
 from langchain_openai import ChatOpenAI
-from chat.api_request_checker_graph.graph import graph as api_request_checker_graph
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -70,7 +69,7 @@ class State(TypedDict):
     next: str
 
 
-members = ["knowledge_base_query_agent", "api_request_checker"]
+members = ["knowledge_base_query_agent", "api_request_checker_agent"]
 # Our team supervisor is an LLM node. It just picks the next agent to process
 # and decides when the work is completed
 options = members + ["FINISH"]
@@ -92,13 +91,13 @@ When finished, respond with FINISH.
 class Router(TypedDict):
     """Worker to route to next. If no workers needed, route to FINISH."""
 
-    next: Literal["knowledge_base_query_agent", "api_request_checker", "FINISH"]
+    next: Literal["knowledge_base_query_agent", "api_request_checker_agent", "FINISH"]
 
 
 llm = ChatOpenAI(model="gpt-4o-mini")
 
 
-def supervisor_node(state: State) -> Command[Literal["knowledge_base_query_agent", "api_request_checker", "FINISH"]]:
+def supervisor_node(state: State) -> Command[Literal["knowledge_base_query_agent", "api_request_checker_agent"]]:
     messages = [
         {"role": "system", "content": system_prompt},
         ] + state["messages"]
@@ -135,10 +134,12 @@ api_request_checker_agent = create_react_agent(
 )
 
 def knowledge_base_query_node(state: State) -> Command[Literal["supervisor"]]:
-    logger.info(f" knowledge base query agent recieved state: {state}")
+    logger.debug(f" knowledge base query agent recieved state: {state}")
+    logger.info(f"In knowledge base query node")
     try:
         result = knowledge_base_query_agent.invoke(state)
-        logger.info(f"knowledge base query agent result: {result}")
+        logger.debug(f"knowledge base query agent result: {result}")
+        logger.info(f"Knowledge base query result received")
         return Command(
             update={
                 "messages": [
@@ -152,14 +153,20 @@ def knowledge_base_query_node(state: State) -> Command[Literal["supervisor"]]:
         raise
 
 def api_request_checker_node(state: State) -> Command[Literal["supervisor"]]:
-    logger.info(f"api request checker agent recieved state: {state}")
+    logger.debug(f"api request checker agent recieved state: {state}")
+    logger.info(f"In api request checker node")
     try:
         result = api_request_checker_agent.invoke(state)
-        logger.info(f"api request checker agent result: {result}")
-        if result["messages"][-1].content == "API request failed":
-            return Command(goto="supervisor")
-        else:
-            return Command(goto="knowledge_base_query_agent")
+        logger.debug(f"api request checker agent result: {result}")
+        logger.info(f"Api request checker result received")
+        return Command(
+            update={
+                "messages": [
+                    HumanMessage(content=result["messages"][-1].content, name="api_request_checker_agent")
+                ]
+            },
+            goto="supervisor"
+        )
     except Exception as e:
         logger.error(f"Error in api request checker agent: {e}")
         raise
