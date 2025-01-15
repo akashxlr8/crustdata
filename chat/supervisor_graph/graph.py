@@ -74,18 +74,13 @@ members = ["knowledge_base_query_agent", "api_request_checker_agent"]
 # and decides when the work is completed
 options = members + ["FINISH"]
 
-system_prompt = """
-You are a supervisor tasked with managing a conversation between the following workers: {members}.
-Given the following user request, respond with the worker to act next.
-
-If the response involves any API requests:
-1. First use the knowledge_base_query_agent to get the API documentation
-2. Then use the api_request_checker to verify the API request
-3. If the API request fails, use the fixed version provided by the checker
-
-Each worker will perform a task and respond with their results and status.
-When finished, respond with FINISH.
-"""
+system_prompt = (
+    "You are a supervisor tasked with managing a conversation between the"
+    f" following workers: {members}. Given the following user request,"
+    " respond with the worker to act next. Each worker will perform a"
+    " task and respond with their results and status. When finished,"
+    " respond with FINISH."
+)
 
 
 class Router(TypedDict):
